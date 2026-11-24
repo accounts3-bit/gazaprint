@@ -59,6 +59,7 @@ label{display:block;font-weight:700;margin:14px 0 4px}
 input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:6px;padding:10px 12px}
 .info p{margin:0 0 14px}
 .info small{color:var(--muted)}
+.hint{display:block;color:var(--muted);font-size:.9rem;margin-top:6px}
 footer{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--muted);font-size:.95rem}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
@@ -112,13 +113,22 @@ footer{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--muted);f
     <div class="box">
       <label for="nm">الاسم</label>
       <input id="nm" autocomplete="name">
+      <label for="ph">رقم الهاتف / واتساب</label>
+      <input id="ph" type="tel" autocomplete="tel" inputmode="tel" dir="ltr">
       <label for="tp">نوع الطباعة</label>
       <select id="tp"><option>مستندات</option><option>بحث أو رسالة</option><option>تصوير</option><option>تجليد</option><option>كتب مدرسية</option><option>بوكلت</option><option>بطاقات ولافتات</option><option>أخرى</option></select>
       <label for="qt">عدد النسخ</label>
       <input id="qt" type="number" min="1" value="1" inputmode="numeric">
       <label for="nt">تفاصيل إضافية</label>
       <textarea id="nt" rows="3" placeholder="المقاس، ألوان أم أبيض وأسود، موعد التسليم"></textarea>
-      <p><button class="btn primary" id="send" type="button" style="margin-top:18px">أرسل عبر واتساب</button></p>
+      <label for="fl">ملف الطباعة (اختياري)</label>
+      <input id="fl" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*,application/pdf">
+      <small class="hint">حتى 25 ميجا. وللملفات الأكبر راسلنا على واتساب.</small>
+      <div class="btns" style="margin-top:18px">
+        <button class="btn primary" id="send" type="button">إرسال الطلب</button>
+        <button class="btn ghost" id="wa" type="button">أو راسلنا على واتساب</button>
+      </div>
+      <p id="note" class="hint" role="status"></p>
     </div>
     <div class="box info">
       <h3 style="margin-bottom:12px">معلومات المكتبة</h3>
@@ -133,13 +143,40 @@ footer{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--muted);f
 
 <footer>© <span id="yr">2026</span> مكتبة غزة للطباعة. جميع الحقوق محفوظة.</footer>
 </div>
+<script src="https://forminit.com/sdk/v1/forminit.js"></script>
 <script>
-var WA_NUMBER="201210540830"; // استبدل برقم واتساب الحقيقي بصيغة دولية بدون +
-document.getElementById("yr").textContent=new Date().getFullYear();
-document.getElementById("send").addEventListener("click",function(){
-  var v=function(id){return document.getElementById(id).value.trim()};
-  var msg="مرحباً، أريد طلب طباعة:\nالاسم: "+v("nm")+"\nالنوع: "+v("tp")+"\nعدد النسخ: "+v("qt")+"\nتفاصيل: "+v("nt");
+var WA_NUMBER="201210540830";
+var FORM_ID="fbg3zcevhyu";
+var MAX_BYTES=25*1024*1024;
+var $=function(id){return document.getElementById(id)};
+$("yr").textContent=new Date().getFullYear();
+$("send").addEventListener("click",async function(){
+  var note=$("note"),btn=this,f=$("fl").files[0];
+  if(!$("nm").value.trim()||!$("ph").value.trim()){note.textContent="من فضلك اكتب الاسم ورقم الهاتف.";return;}
+  if(f&&f.size>MAX_BYTES){note.textContent="حجم الملف أكبر من 25 ميجا. راسلنا على واتساب لإرساله.";return;}
+  if(typeof Forminit==="undefined"){note.textContent="تعذّر الإرسال الآن. راسلنا على واتساب.";return;}
+  btn.disabled=true;note.textContent="جارٍ إرسال الطلب…";
+  try{
+    var fd=new FormData();
+    fd.append("fi-sender-fullName",$("nm").value.trim());
+    fd.append("fi-text-phone",$("ph").value.trim());
+    fd.append("fi-text-type",$("tp").value);
+    fd.append("fi-text-copies",$("qt").value);
+    if($("nt").value.trim()){fd.append("fi-text-notes",$("nt").value.trim());}
+    if(f){fd.append("fi-file-printfile",f);}
+    var res=await new Forminit().submit(FORM_ID,fd);
+    if(res&&res.error){throw new Error(res.error.message||"error");}
+    note.textContent="تم استلام طلبك، وسنتواصل معك على رقم الهاتف قريباً.";
+  }catch(e){
+    note.textContent="تعذّر إرسال الطلب. حاول مرة أخرى أو راسلنا على واتساب.";
+  }
+  btn.disabled=false;
+});
+$("wa").addEventListener("click",function(){
+  var v=function(id){return $(id).value.trim()},f=$("fl").files[0];
+  var msg="مرحباً، أريد طلب طباعة:\nالاسم: "+v("nm")+"\nالهاتف: "+v("ph")+"\nالنوع: "+v("tp")+"\nعدد النسخ: "+v("qt")+"\nتفاصيل: "+v("nt")+(f?"\nالملف: "+f.name+" (سأرسله هنا في المحادثة)":"");
   window.open("https://wa.me/"+WA_NUMBER+"?text="+encodeURIComponent(msg),"_blank","noopener");
+  $("note").textContent=f?"تم فتح واتساب. اضغط على 📎 وأرسل الملف ("+f.name+") في نفس المحادثة.":"";
 });
 </script>
 </body>
