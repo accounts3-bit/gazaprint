@@ -123,10 +123,9 @@ footer{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--muted);f
       <textarea id="nt" rows="3" placeholder="المقاس، ألوان أم أبيض وأسود، موعد التسليم"></textarea>
       <label for="fl">ملف الطباعة (اختياري)</label>
       <input id="fl" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*,application/pdf">
-      <small class="hint">حتى 25 ميجا. وللملفات الأكبر راسلنا على واتساب.</small>
+      <small class="hint">حتى 25 ميجا. بعد الإرسال سيُفتح واتساب برسالة جاهزة، اضغط إرسال لإتمام الطلب.</small>
       <div class="btns" style="margin-top:18px">
         <button class="btn primary" id="send" type="button">إرسال الطلب</button>
-        <button class="btn ghost" id="wa" type="button">أو راسلنا على واتساب</button>
       </div>
       <p id="note" class="hint" role="status"></p>
     </div>
@@ -152,31 +151,34 @@ var $=function(id){return document.getElementById(id)};
 $("yr").textContent=new Date().getFullYear();
 $("send").addEventListener("click",async function(){
   var note=$("note"),btn=this,f=$("fl").files[0];
-  if(!$("nm").value.trim()||!$("ph").value.trim()){note.textContent="من فضلك اكتب الاسم ورقم الهاتف.";return;}
-  if(f&&f.size>MAX_BYTES){note.textContent="حجم الملف أكبر من 25 ميجا. راسلنا على واتساب لإرساله.";return;}
-  if(typeof Forminit==="undefined"){note.textContent="تعذّر الإرسال الآن. راسلنا على واتساب.";return;}
+  var v=function(id){return $(id).value.trim()};
+  if(!v("nm")||!v("ph")){note.textContent="من فضلك اكتب الاسم ورقم الهاتف.";return;}
+  var tooBig=!!(f&&f.size>MAX_BYTES);
+  var w=window.open("","_blank");
   btn.disabled=true;note.textContent="جارٍ إرسال الطلب…";
+  var ok=false;
   try{
+    if(typeof Forminit==="undefined"){throw new Error("sdk");}
     var fd=new FormData();
-    fd.append("fi-sender-fullName",$("nm").value.trim());
-    fd.append("fi-text-phone",$("ph").value.trim());
-    fd.append("fi-text-type",$("tp").value);
-    fd.append("fi-text-copies",$("qt").value);
-    if($("nt").value.trim()){fd.append("fi-text-notes",$("nt").value.trim());}
-    if(f){fd.append("fi-file-printfile",f);}
+    fd.append("fi-sender-fullName",v("nm"));
+    fd.append("fi-text-phone",v("ph"));
+    fd.append("fi-text-type",v("tp"));
+    fd.append("fi-text-copies",v("qt"));
+    if(v("nt")){fd.append("fi-text-notes",v("nt"));}
+    if(f&&!tooBig){fd.append("fi-file-printfile",f);}
     var res=await new Forminit().submit(FORM_ID,fd);
     if(res&&res.error){throw new Error(res.error.message||"error");}
-    note.textContent="تم استلام طلبك، وسنتواصل معك على رقم الهاتف قريباً.";
-  }catch(e){
-    note.textContent="تعذّر إرسال الطلب. حاول مرة أخرى أو راسلنا على واتساب.";
-  }
+    ok=true;
+  }catch(e){ok=false;}
+  var fileLine="";
+  if(f){fileLine=(ok&&!tooBig)?"\nالملف: "+f.name+" (تم رفعه مع الطلب)":"\nالملف: "+f.name+" (سأرسله هنا في المحادثة)";}
+  var msg="مرحباً، أريد طلب طباعة:\nالاسم: "+v("nm")+"\nالهاتف: "+v("ph")+"\nالنوع: "+v("tp")+"\nعدد النسخ: "+v("qt")+(v("nt")?"\nتفاصيل: "+v("nt"):"")+fileLine;
+  var url="https://wa.me/"+WA_NUMBER+"?text="+encodeURIComponent(msg);
+  if(w){w.location.href=url;}else{window.location.href=url;}
+  if(ok&&!(f&&tooBig)){note.textContent="تم استلام طلبك. اضغط إرسال في واتساب لإتمام الطلب.";}
+  else if(f){note.textContent="اضغط إرسال في واتساب، ثم اضغط 📎 وأرسل الملف ("+f.name+") في نفس المحادثة.";}
+  else{note.textContent="اضغط إرسال في واتساب لإتمام الطلب.";}
   btn.disabled=false;
-});
-$("wa").addEventListener("click",function(){
-  var v=function(id){return $(id).value.trim()},f=$("fl").files[0];
-  var msg="مرحباً، أريد طلب طباعة:\nالاسم: "+v("nm")+"\nالهاتف: "+v("ph")+"\nالنوع: "+v("tp")+"\nعدد النسخ: "+v("qt")+"\nتفاصيل: "+v("nt")+(f?"\nالملف: "+f.name+" (سأرسله هنا في المحادثة)":"");
-  window.open("https://wa.me/"+WA_NUMBER+"?text="+encodeURIComponent(msg),"_blank","noopener");
-  $("note").textContent=f?"تم فتح واتساب. اضغط على 📎 وأرسل الملف ("+f.name+") في نفس المحادثة.":"";
 });
 </script>
 </body>
